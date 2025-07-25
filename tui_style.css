@@ -1,0 +1,266 @@
+/* TUI样式表 - DeepCropMapping项目 */
+
+/* --- 全局设置 --- */
+Screen {
+    layout: vertical;
+    background: $surface;
+}
+
+/* --- 头部 --- */
+Header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+    dock: top;
+}
+
+/* --- 欢迎界面 --- */
+WelcomeScreen {
+    align: center middle;
+    background: $panel;
+    width: 100%;
+    height: 100%;
+}
+
+#welcome_screen {
+    background: $panel;
+    color: $text;
+}
+
+.banner {
+    text-style: bold;
+    color: $accent;
+    text-align: center;
+    margin: 2;
+}
+
+.version-info {
+    color: $warning;
+    text-style: bold;
+    text-align: center;
+    margin-top: 1;
+}
+
+/* --- 主界面容器 --- */
+.main-container {
+    padding: 1;
+    background: $surface;
+    width: 100%;
+}
+
+Container {
+    background: $surface;
+    width: 100%;
+    height: 100%;
+}
+
+VerticalScroll {
+    background: $surface;
+    scrollbar-background: $panel;
+    scrollbar-color: $primary;
+}
+
+/* --- 静态组件 --- */
+Static {
+    background: $surface;
+}
+
+/* --- 标题 --- */
+.title {
+    text-style: bold;
+    color: $accent;
+    padding: 1 0;
+    margin-bottom: 1;
+}
+
+Label {
+    color: $text;
+    text-style: bold;
+}
+
+/* --- 按钮 --- */
+Button {
+    background: $primary;
+    color: $text;
+    border: round $primary;
+    padding: 1 2;
+    margin: 1;
+}
+
+Button:hover {
+    background: $primary-lighten-1;
+    text-style: bold;
+}
+
+Button:focus {
+    border: round $accent;
+    background: $primary-darken-1;
+}
+
+/* --- 输入框 --- */
+Input {
+    background: $surface;
+    color: $text;
+    border: round $primary;
+    padding: 1;
+}
+
+Input:focus {
+    border: round $accent;
+}
+
+/* --- 占位符 --- */
+Placeholder {
+    background: $panel;
+    color: $text-muted;
+    border: dashed $primary;
+    padding: 2;
+    text-align: center;
+}
+
+/* --- 进度条 --- */
+ProgressBar {
+    background: $panel;
+    color: $accent;
+    border: round $primary;
+}
+
+/* --- 数据表格 --- */
+DataTable {
+    width: 100%;
+    height: auto;
+    margin-bottom: 2;
+    background: $boost;
+    border: round $primary;
+    scrollbar-background: $panel;
+    scrollbar-color: $primary;
+}
+
+DataTable:focus {
+    border: round $accent;
+}
+
+DataTable > .datatable--header {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary-lighten-2;
+}
+
+/* --- 特定表格样式 --- */
+#overview_table {
+    min-height: 15;
+}
+
+#distribution_table {
+    min-height: 10;
+}
+
+/* --- 日志面板 --- */
+.log-panel {
+    height: 10;
+    margin-top: 1;
+    border: round $primary-lighten-2;
+    background: $panel;
+}
+
+Log {
+    background: $panel;
+    color: $text;
+    border: round $primary-lighten-2;
+    scrollbar-background: $surface;
+    scrollbar-color: $primary;
+}
+
+#data_log {
+    background: $panel;
+    border: round $primary;
+}
+
+/* --- Markdown --- */
+Markdown {
+    background: $surface;
+    color: $text;
+    padding: 1;
+}
+
+/* --- 页脚 --- */
+Footer {
+    background: $primary-darken-2;
+    dock: bottom;
+}
+
+Footer > .footer--key {
+    background: $primary-darken-1;
+    color: $text;
+    text-style: bold;
+}
+
+Footer > .footer--description {
+    color: $text-muted;
+}
+
+/* --- 标签页 --- */
+Tabs {
+    background: $primary;
+    dock: top;
+}
+
+#data_tabs {
+    background: $primary;
+    margin-bottom: 1;
+}
+
+Tab {
+    padding: 1 2;
+    color: $text;
+    background: $primary-darken-1;
+    border: round $primary;
+}
+
+Tab:hover {
+    background: $primary-lighten-1;
+    text-style: bold;
+}
+
+Tab.-active {
+    background: $surface;
+    text-style: bold;
+    color: $text;
+    border: round $accent;
+}
+
+/* --- 特定Tab样式 --- */
+#tab_overview, #tab_spatial, #tab_spectral, #tab_temporal {
+    padding: 1;
+}
+
+/* --- 数据分析屏幕 --- */
+#data_analysis_screen {
+    background: $surface;
+    width: 100%;
+    height: 100%;
+}
+
+/* --- 滚动条全局设置 --- */
+* {
+    scrollbar-size: 1 1;
+    scrollbar-background: $panel;
+    scrollbar-color: $primary;
+}
+
+/* --- 深色模式优化 --- */
+.dark {
+    background: $surface-darken-2;
+}
+
+.dark DataTable {
+    background: $boost-darken-1;
+}
+
+.dark Log {
+    background: $panel-darken-1;
+}
