@@ -1,0 +1,47 @@
+Metadata-Version: 2.4
+Name: DeepCropMapping
+Version: 0.1.0
+Summary: Deep learning-based crop mapping using multi-temporal satellite imagery
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: torch>=2.0.0
+Requires-Dist: torchvision>=0.15.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: scipy>=1.11.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: opencv-python>=4.8.0
+Requires-Dist: pillow>=10.0.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: jupyter>=1.0.0
+Requires-Dist: ipykernel>=6.25.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: h5py>=3.9.0
+Requires-Dist: textual>=5.0.0
+Requires-Dist: rich>=14.1.0
+Requires-Dist: wandb>=0.17.0
+Provides-Extra: geospatial
+Requires-Dist: rasterio>=1.3.0; extra == "geospatial"
+Requires-Dist: geopandas>=0.13.0; extra == "geospatial"
+Requires-Dist: shapely>=2.0.0; extra == "geospatial"
+Requires-Dist: fiona>=1.9.0; extra == "geospatial"
+Requires-Dist: pyproj>=3.6.0; extra == "geospatial"
+Provides-Extra: remote-sensing
+Requires-Dist: earthengine-api>=0.1.360; extra == "remote-sensing"
+Requires-Dist: planetary-computer>=0.4.0; extra == "remote-sensing"
+Requires-Dist: pystac-client>=0.7.0; extra == "remote-sensing"
+Requires-Dist: rio-cogeo>=3.5.0; extra == "remote-sensing"
+Provides-Extra: extra-viz
+Requires-Dist: plotly>=5.15.0; extra == "extra-viz"
+Provides-Extra: data-formats
+Requires-Dist: netcdf4>=1.6.0; extra == "data-formats"
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: ruff>=0.0.280; extra == "dev"
+Requires-Dist: mypy>=1.5.0; extra == "dev"
+Requires-Dist: pre-commit>=3.3.0; extra == "dev"
+Dynamic: license-file
