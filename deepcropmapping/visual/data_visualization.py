@@ -22,11 +22,6 @@ plt.rcParams['font.size'] = 10
 plt.rcParams['axes.unicode_minus'] = False
 sns.set_style("whitegrid")
 
-# 计算项目根目录的绝对路径
-# __file__ -> .../deepcropmapping/visual/data_visualization.py
-# .parent -> .../deepcropmapping/visual/
-# .parent -> .../deepcropmapping/
-# .parent -> .../ (项目根目录)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 class CropDataVisualizer:
@@ -40,28 +35,38 @@ class CropDataVisualizer:
             data_dir: 数据集目录路径。如果为None，则自动指向项目根目录下的/dataset
         """
         if data_dir is None:
-            # 智能查找数据集目录
-            possible_paths = [
-                PROJECT_ROOT / "dataset",  # 标准路径
-                Path.cwd() / "dataset",    # 当前目录下
-                Path.cwd().parent / "dataset",  # 父目录下
-                Path(__file__).resolve().parent.parent.parent / "dataset",  # 从文件位置计算
-            ]
+            current_file = Path(__file__).resolve()
+            project_root = current_file.parent.parent.parent  
+            dataset_path = project_root / "dataset"
             
-            # 查找第一个存在的路径
-            for path in possible_paths:
-                if path.exists() and (path / "x.npy").exists():
-                    self.data_dir = path
-                    break
+            if dataset_path.exists() and (dataset_path / "x.npy").exists() and (dataset_path / "y.npy").exists():
+                self.data_dir = dataset_path
             else:
-                # 如果都不存在，使用默认路径
-                self.data_dir = PROJECT_ROOT / "dataset"
+                possible_paths = [
+                    Path("/Users/ff_crazy/ myProj/DeepCropMapping/dataset"),
+                    Path.cwd().parent / "dataset",
+                    Path.cwd() / "dataset",
+                    PROJECT_ROOT / "dataset",
+                    Path.cwd().parent.parent / "dataset",
+                ]
+                
+                found = False
+                for path in possible_paths:
+                    try:
+                        if path.exists() and (path / "x.npy").exists() and (path / "y.npy").exists():
+                            self.data_dir = path
+                            found = True
+                            break
+                    except:
+                        continue
+                
+                if not found:
+                    self.data_dir = dataset_path
         else:
             self.data_dir = Path(data_dir)
         self.x_data = None
         self.y_data = None
         
-        # 作物类别定义
         self.crop_labels = {
             0: 'Background/Unknown',
             1: 'Corn (玉米)',
@@ -74,17 +79,16 @@ class CropDataVisualizer:
             8: 'Other (其他)'
         }
         
-        # 颜色映射
         self.colors = [
-            '#000000',  # 0: 黑色 - Background
-            '#FFD700',  # 1: 金色 - 玉米
-            '#8B4513',  # 2: 棕色 - 小麦
-            '#FFA500',  # 3: 橙色 - 向日葵  
-            '#FF6347',  # 4: 番茄色 - 番瓜
-            '#808080',  # 5: 灰色 - 人造地表
-            '#0000FF',  # 6: 蓝色 - 水体
-            '#696969',  # 7: 深灰 - 道路
-            '#9ACD32'   # 8: 黄绿色 - 其他
+            '#000000',  # Background
+            '#FFD700',  # 玉米
+            '#8B4513',  # 小麦
+            '#FFA500',  # 向日葵  
+            '#FF6347',  # 番瓜
+            '#808080',  # 人造地表
+            '#0000FF',  # 水体
+            '#696969',  # 道路
+            '#9ACD32'   # 其他
         ]
         
         self.load_data()
@@ -92,19 +96,22 @@ class CropDataVisualizer:
     def load_data(self) -> None:
         """加载数据集"""
         try:
-            print("Loading dataset...")
             x_path = self.data_dir / "x.npy"
             y_path = self.data_dir / "y.npy"
             
+            if not self.data_dir.exists():
+                raise FileNotFoundError(f"Dataset directory does not exist: {self.data_dir}")
+            
             if not x_path.exists() or not y_path.exists():
-                raise FileNotFoundError(f"Data files not found in {self.data_dir}")
+                missing_files = []
+                if not x_path.exists():
+                    missing_files.append("x.npy")
+                if not y_path.exists():
+                    missing_files.append("y.npy")
+                raise FileNotFoundError(f"Data files {missing_files} not found in {self.data_dir}")
             
-            self.x_data = np.load(x_path)  # (326, 1025, 28, 8)
-            self.y_data = np.load(y_path)  # (326, 1025)
-            
-            print(f"X data shape: {self.x_data.shape}")
-            print(f"Y data shape: {self.y_data.shape}")
-            print("Dataset loaded successfully!\n")
+            self.x_data = np.load(x_path)
+            self.y_data = np.load(y_path)
             
         except Exception as e:
             print(f"Error loading data: {e}")
@@ -116,7 +123,6 @@ class CropDataVisualizer:
         print("DATASET OVERVIEW")
         print("=" * 50)
         
-        # X数据统计
         print("Multi-spectral Data (X):")
         print(f"  Shape: {self.x_data.shape}")
         print(f"  Data type: {self.x_data.dtype}")
@@ -125,13 +131,11 @@ class CropDataVisualizer:
         print(f"  Mean value: {self.x_data.mean():.2f}")
         print(f"  Std deviation: {self.x_data.std():.2f}")
         
-        # Y数据统计
         print(f"\nLabel Data (Y):")
         print(f"  Shape: {self.y_data.shape}")
         print(f"  Data type: {self.y_data.dtype}")
         print(f"  Unique labels: {np.unique(self.y_data)}")
         
-        # 各类别统计
         unique_labels, counts = np.unique(self.y_data, return_counts=True)
         total_pixels = self.y_data.size
         
@@ -147,7 +151,6 @@ class CropDataVisualizer:
         
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
         
-        # 饼图
         crop_names = [self.crop_labels.get(label, f"Class {label}") for label in unique_labels]
         colors_subset = [self.colors[label] for label in unique_labels]
         
@@ -155,7 +158,6 @@ class CropDataVisualizer:
                                           autopct='%1.1f%%', startangle=90)
         ax1.set_title('Crop Class Distribution (Pie Chart)', fontsize=14, fontweight='bold')
         
-        # 条形图
         bars = ax2.bar(range(len(unique_labels)), counts, color=colors_subset)
         ax2.set_xlabel('Crop Classes', fontweight='bold')
         ax2.set_ylabel('Number of Pixels', fontweight='bold')
@@ -165,7 +167,6 @@ class CropDataVisualizer:
                             for label, name in zip(unique_labels, crop_names)], 
                            rotation=45, ha='right')
         
-        # 添加数值标签
         for bar, count in zip(bars, counts):
             ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + max(counts)*0.01,
                     f'{count:,}', ha='center', va='bottom', fontweight='bold')
@@ -182,18 +183,15 @@ class CropDataVisualizer:
         """绘制空间分布图"""
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         
-        # 创建颜色映射
         cmap = mcolors.ListedColormap(self.colors[:len(np.unique(self.y_data))])
         bounds = list(range(len(np.unique(self.y_data)) + 1))
         norm = mcolors.BoundaryNorm(bounds, cmap.N)
         
-        # 完整标签图
         im1 = axes[0,0].imshow(self.y_data, cmap=cmap, norm=norm)
         axes[0,0].set_title('Complete Label Map', fontsize=12, fontweight='bold')
         axes[0,0].set_xlabel('Width (pixels)')
         axes[0,0].set_ylabel('Height (pixels)')
         
-        # 局部放大图 (中心区域)
         h, w = self.y_data.shape
         center_h, center_w = h//2, w//2
         crop_size = 200
@@ -205,7 +203,6 @@ class CropDataVisualizer:
         axes[0,1].set_xlabel('Width (pixels)')
         axes[0,1].set_ylabel('Height (pixels)')
         
-        # 按行统计
         row_distribution = np.array([np.bincount(self.y_data[i], minlength=9) 
                                     for i in range(self.y_data.shape[0])])
         im3 = axes[1,0].imshow(row_distribution.T, aspect='auto', cmap='viridis')
@@ -213,7 +210,6 @@ class CropDataVisualizer:
         axes[1,0].set_xlabel('Row Index')
         axes[1,0].set_ylabel('Crop Class')
         
-        # 按列统计  
         col_distribution = np.array([np.bincount(self.y_data[:, j], minlength=9) 
                                     for j in range(self.y_data.shape[1])])
         im4 = axes[1,1].imshow(col_distribution.T, aspect='auto', cmap='viridis')
@@ -221,7 +217,6 @@ class CropDataVisualizer:
         axes[1,1].set_xlabel('Column Index')
         axes[1,1].set_ylabel('Crop Class')
         
-        # 添加颜色条
         unique_labels = np.unique(self.y_data)
         cbar = plt.colorbar(im1, ax=axes[0,:], orientation='horizontal', 
                            fraction=0.05, pad=0.1, shrink=0.8)
@@ -241,14 +236,12 @@ class CropDataVisualizer:
     def plot_spectral_analysis(self, sample_points: int = 100, 
                               save_path: Optional[str] = None) -> None:
         """光谱分析图"""
-        # 随机采样点进行分析
         h, w = self.y_data.shape
         sample_indices = np.random.choice(h * w, sample_points, replace=False)
         sample_coords = [(idx // w, idx % w) for idx in sample_indices]
         
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         
-        # 各波段均值分布
         band_means = np.mean(self.x_data, axis=(0, 1, 2))  # 对空间和时间维度求均值
         axes[0,0].bar(range(8), band_means, color='skyblue', edgecolor='navy')
         axes[0,0].set_title('Mean Values Across Bands', fontsize=12, fontweight='bold')
@@ -256,7 +249,6 @@ class CropDataVisualizer:
         axes[0,0].set_ylabel('Mean Value')
         axes[0,0].set_xticks(range(8))
         
-        # 各波段方差分布
         band_stds = np.std(self.x_data, axis=(0, 1, 2))
         axes[0,1].bar(range(8), band_stds, color='lightcoral', edgecolor='darkred')
         axes[0,1].set_title('Standard Deviation Across Bands', fontsize=12, fontweight='bold')
@@ -264,7 +256,6 @@ class CropDataVisualizer:
         axes[0,1].set_ylabel('Standard Deviation')
         axes[0,1].set_xticks(range(8))
         
-        # 不同类别的光谱特征对比 (第一期数据)
         unique_labels = np.unique(self.y_data)
         for label in unique_labels[:6]:  # 只显示前6个类别避免图像过乱
             mask = self.y_data == label
@@ -282,7 +273,6 @@ class CropDataVisualizer:
         axes[1,0].legend()
         axes[1,0].grid(True, alpha=0.3)
         
-        # 光谱值分布直方图
         random_pixels = self.x_data.reshape(-1, 28, 8)[::1000]  # 每1000个像素取1个
         all_bands = random_pixels[:, 0, :].flatten()  # 取第一期的所有波段
         axes[1,1].hist(all_bands, bins=50, alpha=0.7, color='green', edgecolor='darkgreen')
@@ -304,10 +294,8 @@ class CropDataVisualizer:
         """时序数据分析"""
         fig, axes = plt.subplots(3, 2, figsize=(16, 18))
         
-        # 1. 不同作物类型的NDVI时序曲线
         unique_labels = np.unique(self.y_data)
         
-        # 计算NDVI (假设Band4=NIR, Band3=Red)
         nir = self.x_data[:, :, :, 3].astype(np.float32)
         red = self.x_data[:, :, :, 2].astype(np.float32)
         ndvi = (nir - red) / (nir + red + 1e-8)
@@ -331,7 +319,6 @@ class CropDataVisualizer:
         ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax.grid(True, alpha=0.3)
         
-        # 2. 随机像素点的光谱时序变化
         ax = axes[0,1]
         h, w = self.y_data.shape
         for i in range(min(sample_pixels, 10)):
@@ -346,7 +333,6 @@ class CropDataVisualizer:
         ax.set_ylabel('Spectral Value')
         ax.grid(True, alpha=0.3)
         
-        # 3. 各时期的数据统计
         ax = axes[1,0]
         temporal_means = np.mean(self.x_data, axis=(0, 1, 3))  # 对空间和波段维度求均值
         temporal_stds = np.std(self.x_data, axis=(0, 1, 3))
@@ -360,9 +346,7 @@ class CropDataVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
         
-        # 4. 时序数据的热力图
         ax = axes[1,1]
-        # 随机选择一些像素进行可视化
         sample_indices = np.random.choice(h * w, 50, replace=False)
         sample_coords = [(idx // w, idx % w) for idx in sample_indices]
         
@@ -378,9 +362,7 @@ class CropDataVisualizer:
         ax.set_ylabel('Pixel Index')
         plt.colorbar(im, ax=ax)
         
-        # 5. 季节性变化分析
         ax = axes[2,0]
-        # 计算各月份的平均NDVI
         monthly_ndvi = []
         months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']
         periods_per_month = 28 // 7  # 每月大约4期
@@ -400,9 +382,7 @@ class CropDataVisualizer:
         ax.set_ylabel('NDVI Value')
         ax.tick_params(axis='x', rotation=45)
         
-        # 6. 时序数据的统计分布
         ax = axes[2,1]
-        # 计算每个像素的时序方差
         pixel_variance = np.var(self.x_data[:, :, :, 0], axis=2)  # 时间维度的方差
         
         ax.hist(pixel_variance.flatten(), bins=50, alpha=0.7, color='purple', edgecolor='black')
@@ -424,21 +404,17 @@ class CropDataVisualizer:
         h, w = self.y_data.shape
         
         if x_coord is None or y_coord is None:
-            # 随机选择一个像素点
             x_coord = np.random.randint(0, w)
             y_coord = np.random.randint(0, h)
         
-        # 确保坐标在有效范围内
         x_coord = max(0, min(x_coord, w-1))
         y_coord = max(0, min(y_coord, h-1))
         
-        # 获取该像素点的数据
         pixel_label = self.y_data[y_coord, x_coord]
         pixel_spectral = self.x_data[y_coord, x_coord, :, :]  # (28, 8)
         
         fig, axes = plt.subplots(2, 2, figsize=(16, 12))
         
-        # 1. 该像素点的所有波段时序曲线
         ax = axes[0,0]
         for band in range(8):
             ax.plot(range(28), pixel_spectral[:, band], marker='o', 
@@ -452,7 +428,6 @@ class CropDataVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
         
-        # 2. NDVI时序曲线
         ax = axes[0,1]
         nir = pixel_spectral[:, 3].astype(np.float32)
         red = pixel_spectral[:, 2].astype(np.float32)
@@ -467,7 +442,6 @@ class CropDataVisualizer:
         ax.axhline(y=0.5, color='r', linestyle='--', alpha=0.7, label='Vegetation Threshold')
         ax.legend()
         
-        # 3. 光谱特征热力图
         ax = axes[1,0]
         im = ax.imshow(pixel_spectral.T, cmap='viridis', aspect='auto')
         ax.set_title(f'Spectral-Temporal Heatmap', fontsize=12, fontweight='bold')
@@ -477,9 +451,7 @@ class CropDataVisualizer:
         ax.set_yticklabels([f'Band {i+1}' for i in range(8)])
         plt.colorbar(im, ax=ax)
         
-        # 4. 周围区域的标签分布
         ax = axes[1,1]
-        # 提取该像素点周围的小区域
         patch_size = 20
         start_y = max(0, y_coord - patch_size//2)
         end_y = min(h, y_coord + patch_size//2)
@@ -488,7 +460,6 @@ class CropDataVisualizer:
         
         local_patch = self.y_data[start_y:end_y, start_x:end_x]
         
-        # 创建颜色映射
         unique_local = np.unique(local_patch)
         cmap = mcolors.ListedColormap([self.colors[i] for i in unique_local])
         bounds = list(range(len(unique_local) + 1))
@@ -496,7 +467,6 @@ class CropDataVisualizer:
         
         im = ax.imshow(local_patch, cmap=cmap, norm=norm)
         
-        # 标记目标像素点
         target_y = y_coord - start_y
         target_x = x_coord - start_x  
         ax.plot(target_x, target_y, 'r*', markersize=15, markeredgewidth=2, markeredgecolor='white')
@@ -509,7 +479,6 @@ class CropDataVisualizer:
         plt.tight_layout()
         plt.show()
         
-        # 打印详细信息
         print(f"\n=== Pixel Information ===")
         print(f"Coordinates: ({y_coord}, {x_coord})")
         print(f"Label: {pixel_label} - {self.crop_labels.get(pixel_label, 'Unknown')}")
@@ -524,20 +493,17 @@ class CropDataVisualizer:
         
         print("Generating comprehensive data analysis report...")
         
-        # 生成所有可视化图表
         self.plot_class_distribution(f"{output_dir}/class_distribution.png")
         self.plot_spatial_distribution(f"{output_dir}/spatial_distribution.png")
         self.plot_spectral_analysis(f"{output_dir}/spectral_analysis.png")
         self.plot_temporal_analysis(f"{output_dir}/temporal_analysis.png")
         
-        # 生成文本报告
         report_path = f"{output_dir}/data_analysis_report.txt"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write("=" * 60 + "\n")
             f.write("DEEPCROPMAPPING DATASET ANALYSIS REPORT\n")
             f.write("=" * 60 + "\n\n")
             
-            # 数据概况
             f.write("1. DATASET OVERVIEW\n")
             f.write("-" * 30 + "\n")
             f.write(f"Multi-spectral data shape: {self.x_data.shape}\n")
@@ -545,7 +511,6 @@ class CropDataVisualizer:
             f.write(f"Data type: {self.x_data.dtype}\n")
             f.write(f"Memory usage: {self.x_data.nbytes / (1024**2):.2f} MB\n\n")
             
-            # 类别分布
             unique_labels, counts = np.unique(self.y_data, return_counts=True)
             total_pixels = self.y_data.size
             
@@ -556,17 +521,14 @@ class CropDataVisualizer:
                 crop_name = self.crop_labels.get(label, f"Unknown({label})")
                 f.write(f"{crop_name}: {count:,} pixels ({percentage:.2f}%)\n")
             
-            # 数据质量评估
             f.write("\n3. DATA QUALITY ASSESSMENT\n")
             f.write("-" * 30 + "\n")
             
-            # 检查异常值
             extreme_high = np.sum(self.x_data > np.percentile(self.x_data, 99.9))
             extreme_low = np.sum(self.x_data == 0)
             f.write(f"Extreme high values (>99.9 percentile): {extreme_high:,}\n")
             f.write(f"Zero values: {extreme_low:,}\n")
             
-            # 时序数据连续性
             temporal_mean = np.mean(self.x_data, axis=(0, 1, 3))
             temporal_diff = np.diff(temporal_mean)
             max_jump = np.max(np.abs(temporal_diff))
@@ -593,32 +555,21 @@ def main():
     """主函数 - 命令行接口"""
     import sys
     
-    if len(sys.argv) > 1:
-        data_dir = sys.argv[1]
-        # 初始化可视化器
-        visualizer = CropDataVisualizer(data_dir)
-    else:
-        # 使用默认路径
-        visualizer = CropDataVisualizer()
     
-    # 显示数据概览
     visualizer.data_overview()
     
     print("\nStarting visualization analysis...")
     print("Close each plot window to proceed to the next visualization.")
     
-    # 依次展示各种可视化
     try:
         visualizer.plot_class_distribution()
         visualizer.plot_spatial_distribution()
         visualizer.plot_spectral_analysis()
         visualizer.plot_temporal_analysis()
         
-        # 交互式探索示例
         print("\nInteractive pixel exploration (random pixel):")
         visualizer.interactive_pixel_explorer()
         
-        # 询问是否生成完整报告
         response = input("\nGenerate complete analysis report? (y/n): ")
         if response.lower() in ['y', 'yes']:
             visualizer.generate_report()
