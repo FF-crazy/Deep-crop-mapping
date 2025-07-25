@@ -17,22 +17,47 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # 设置中文字体和样式
-plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans']
+plt.rcParams['font.sans-serif'] = ['PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['font.size'] = 10
 plt.rcParams['axes.unicode_minus'] = False
 sns.set_style("whitegrid")
 
+# 计算项目根目录的绝对路径
+# __file__ -> .../deepcropmapping/visual/data_visualization.py
+# .parent -> .../deepcropmapping/visual/
+# .parent -> .../deepcropmapping/
+# .parent -> .../ (项目根目录)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 class CropDataVisualizer:
     """农作物数据可视化器"""
     
-    def __init__(self, data_dir: str = "../dataset"):
+    def __init__(self, data_dir: Optional[str] = None):
         """
         初始化可视化器
         
         Args:
-            data_dir: 数据集目录路径
+            data_dir: 数据集目录路径。如果为None，则自动指向项目根目录下的/dataset
         """
-        self.data_dir = Path(data_dir)
+        if data_dir is None:
+            # 智能查找数据集目录
+            possible_paths = [
+                PROJECT_ROOT / "dataset",  # 标准路径
+                Path.cwd() / "dataset",    # 当前目录下
+                Path.cwd().parent / "dataset",  # 父目录下
+                Path(__file__).resolve().parent.parent.parent / "dataset",  # 从文件位置计算
+            ]
+            
+            # 查找第一个存在的路径
+            for path in possible_paths:
+                if path.exists() and (path / "x.npy").exists():
+                    self.data_dir = path
+                    break
+            else:
+                # 如果都不存在，使用默认路径
+                self.data_dir = PROJECT_ROOT / "dataset"
+        else:
+            self.data_dir = Path(data_dir)
         self.x_data = None
         self.y_data = None
         
@@ -570,11 +595,11 @@ def main():
     
     if len(sys.argv) > 1:
         data_dir = sys.argv[1]
+        # 初始化可视化器
+        visualizer = CropDataVisualizer(data_dir)
     else:
-        data_dir = "../dataset"
-    
-    # 初始化可视化器
-    visualizer = CropDataVisualizer(data_dir)
+        # 使用默认路径
+        visualizer = CropDataVisualizer()
     
     # 显示数据概览
     visualizer.data_overview()
