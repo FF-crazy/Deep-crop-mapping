@@ -157,7 +157,12 @@ def train_model(config: Dict[str, Any]):
     主训练函数
     """
     # 设置设备
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
     print(f"Using device: {device}")
     
     # 准备数据
