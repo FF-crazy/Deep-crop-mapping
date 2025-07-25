@@ -1,0 +1,48 @@
+'''# ==========================
+#  Python & IDE Cache
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+dist/
+
+# Project-specific temp files
+*.log
+*.db
+*.sqlite3
+
+# Virtual environment
+.venv/
+
+# IDE-specific
+.idea/
+.vscode/
+
+# ==========================
+#  Project Specific Ignores
+# ==========================
+
+# Documentation & Large Data Files
+/doc&spec/
+/dataset/
+/visualization_output/
+/processed_data/
+/models/
+
+# API Keys & Secrets
+# (Add any files containing secrets here, e.g., keys.env)
+
+# ==========================
+#  System Files
+# ==========================
+.DS_Store
+
+# ==========================
+#  Claude Code Specific
+# ==========================
+CLAUDE.md
+'''
