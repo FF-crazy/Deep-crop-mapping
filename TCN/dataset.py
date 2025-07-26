@@ -71,9 +71,9 @@ class CropMappingDataset(Dataset):
         
         for i in range(0, h - self.patch_size + 1, self.stride):
             for j in range(0, w - self.patch_size + 1, self.stride):
-                # 检查切片是否包含有效数据（非背景）
+                # 检查切片是否包含有效数据（有效标签1-8）
                 patch_labels = self.y_data[i:i+self.patch_size, j:j+self.patch_size]
-                if np.any(patch_labels > 0):  # 包含非背景像素
+                if np.any((patch_labels >= 1) & (patch_labels <= 8)):  # 包含有效标签像素
                     patches.append((i, j))
         
         return patches
@@ -87,6 +87,9 @@ class CropMappingDataset(Dataset):
         # 提取切片
         x_patch = self.x_data[i:i+self.patch_size, j:j+self.patch_size]
         y_patch = self.y_data[i:i+self.patch_size, j:j+self.patch_size]
+        
+        # 将标签从1-8转换为0-7（PyTorch交叉熵损失要求从0开始）
+        y_patch = y_patch - 1
         
         # 转换为张量
         x_patch = torch.from_numpy(x_patch).float()
@@ -154,8 +157,11 @@ def prepare_data(
     print(f"Original data shape - X: {x_data.shape}, Y: {y_data.shape}")
     
     # 计算类别权重（处理类别不平衡）
-    unique_labels, counts = np.unique(y_data, return_counts=True)
-    class_weights = len(y_data.flatten()) / (len(unique_labels) * counts)
+    # 只考虑有效标签1-8，转换为0-7后计算权重
+    valid_mask = (y_data >= 1) & (y_data <= 8)
+    valid_labels = y_data[valid_mask] - 1  # 转换为0-7
+    unique_labels, counts = np.unique(valid_labels, return_counts=True)
+    class_weights = len(valid_labels) / (len(unique_labels) * counts)
     class_weights = torch.FloatTensor(class_weights)
     
     # 创建数据集
@@ -217,15 +223,14 @@ def prepare_data(
         'num_classes': len(unique_labels),
         'class_weights': class_weights,
         'class_names': {
-            0: 'Background',
-            1: 'Corn',
-            2: 'Wheat',
-            3: 'Sunflower',
-            4: 'Pumpkin',
-            5: 'Artificial_Surface',
-            6: 'Water',
-            7: 'Road',
-            8: 'Other'
+            0: 'Corn',
+            1: 'Wheat',
+            2: 'Sunflower',
+            3: 'Pumpkin',
+            4: 'Artificial_Surface',
+            5: 'Water',
+            6: 'Road',
+            7: 'Other'
         },
         'scaler': full_dataset.scaler if hasattr(full_dataset, 'scaler') else None,
         'patch_size': patch_size,

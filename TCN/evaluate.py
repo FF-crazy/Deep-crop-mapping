@@ -273,7 +273,8 @@ def main():
     )
     
     # 创建并加载模型
-    checkpoint = torch.load(args.model_path, map_location=device)
+    from compat import load_checkpoint
+    checkpoint = load_checkpoint(args.model_path, map_location=str(device))
     
     # 从检查点获取模型配置
     config = checkpoint.get('config', {})

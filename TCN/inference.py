@@ -36,7 +36,8 @@ class CropMappingInference:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         
         # 加载模型配置
-        checkpoint = torch.load(model_path, map_location=self.device)
+        from .compat import load_checkpoint
+        checkpoint = load_checkpoint(model_path, map_location=str(self.device))
         self.config = checkpoint.get('config', {})
         
         # 加载数据信息

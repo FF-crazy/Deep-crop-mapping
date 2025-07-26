@@ -66,7 +66,8 @@ def load_checkpoint(filepath: str, model: torch.nn.Module, optimizer: torch.opti
     """
     加载训练检查点
     """
-    checkpoint = torch.load(filepath, map_location='cpu')
+    from .compat import load_checkpoint as compat_load_checkpoint
+    checkpoint = compat_load_checkpoint(filepath, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
     
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
@@ -98,7 +99,8 @@ def load_model(model_path: str, model: torch.nn.Module) -> Dict[str, Any]:
     """
     加载模型用于推理
     """
-    checkpoint = torch.load(model_path, map_location='cpu')
+    from .compat import load_checkpoint as compat_load_checkpoint
+    checkpoint = compat_load_checkpoint(model_path, map_location='cpu')
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     
