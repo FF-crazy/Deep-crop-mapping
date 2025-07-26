@@ -32,6 +32,9 @@ dist/
 /visualization_output/
 /processed_data/
 /models/
+/checkpoints/
+/checkpoints_test/
+/TCN/checkpoints_test/
 
 # API Keys & Secrets
 # (Add any files containing secrets here, e.g., keys.env)
