@@ -49,7 +49,9 @@ class CropMappingInference:
             input_channels=self.config.get('input_channels', 8),
             temporal_steps=self.config.get('temporal_steps', 28),
             num_classes=self.data_info['num_classes'],
-            tcn_channels=self.config.get('tcn_channels', [64, 128, 256])
+            tcn_channels=self.config.get('tcn_channels', [64, 128, 256]),
+            kernel_size=self.config.get('kernel_size', 3),
+            dropout=self.config.get('dropout', 0.2)
         ).to(self.device)
         
         # 加载权重

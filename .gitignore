@@ -34,6 +34,7 @@ dist/
 /models/
 /checkpoints/
 /checkpoints_test/
+/checkpoints_train/
 /TCN/checkpoints_test/
 
 # API Keys & Secrets
