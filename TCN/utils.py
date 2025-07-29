@@ -239,7 +239,14 @@ def plot_class_performance(metrics: Dict[str, Any], save_path: str = None):
     """
     绘制每类性能图表
     """
-    class_names = [metrics['class_names'][i] for i in range(len(metrics['per_class_accuracy']))]
+    # 处理标签索引问题：训练时使用0-7，但class_names使用1-8
+    if 'class_names' in metrics and 1 in metrics['class_names']:
+        # class_names 使用原始标签 1-8，需要映射到索引 0-7
+        class_names = [metrics['class_names'][i+1] for i in range(len(metrics['per_class_accuracy']))]
+    else:
+        # 如果已经是 0-7 索引，直接使用
+        class_names = [metrics['class_names'][i] for i in range(len(metrics['per_class_accuracy']))]
+    
     accuracies = metrics['per_class_accuracy']
     ious = metrics['per_class_iou']
     

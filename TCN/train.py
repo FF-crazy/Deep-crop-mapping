@@ -19,9 +19,9 @@ import wandb
 import argparse
 from tqdm import tqdm
 
-from model import create_tcn_model
-from dataset import prepare_data, save_data_info
-from utils import (
+from TCN.model import create_tcn_model
+from TCN.dataset import prepare_data, save_data_info
+from TCN.utils import (
     save_checkpoint, 
     load_checkpoint, 
     EarlyStopping,

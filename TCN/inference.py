@@ -16,9 +16,9 @@ from PIL import Image
 import rasterio
 from rasterio.transform import from_bounds
 
-from model import create_tcn_model
-from dataset import load_data_info
-from utils import load_model
+from TCN.model import create_tcn_model
+from TCN.dataset import load_data_info
+from TCN.utils import load_model
 
 
 class CropMappingInference:
