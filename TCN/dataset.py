@@ -223,14 +223,14 @@ def prepare_data(
         'num_classes': len(unique_labels),
         'class_weights': class_weights,
         'class_names': {
-            0: 'Corn',
-            1: 'Wheat',
-            2: 'Sunflower',
-            3: 'Pumpkin',
-            4: 'Artificial_Surface',
-            5: 'Water',
-            6: 'Road',
-            7: 'Other'
+            1: 'Corn',
+            2: 'Wheat', 
+            3: 'Sunflower',
+            4: 'Pumpkin',
+            5: 'Artificial_Surface',
+            6: 'Water',
+            7: 'Road',
+            8: 'Other'
         },
         'scaler': full_dataset.scaler if hasattr(full_dataset, 'scaler') else None,
         'patch_size': patch_size,
