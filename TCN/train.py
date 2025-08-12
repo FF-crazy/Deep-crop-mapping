@@ -32,12 +32,13 @@ from TCN.utils import (
 
 class FocalLoss(nn.Module):
     """
-    Focal Loss用于处理类别不平衡
+    增强版Focal Loss用于处理类别不平衡
     """
-    def __init__(self, alpha: torch.Tensor = None, gamma: float = 2.0):
+    def __init__(self, alpha: torch.Tensor = None, gamma: float = 2.5, reduction: str = 'mean'):
         super().__init__()
         self.alpha = alpha
         self.gamma = gamma
+        self.reduction = reduction
         
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         ce_loss = nn.functional.cross_entropy(inputs, targets, reduction='none')
@@ -49,8 +50,96 @@ class FocalLoss(nn.Module):
                 self.alpha = self.alpha.to(targets.device)
             alpha_t = self.alpha[targets]
             focal_loss = alpha_t * focal_loss
+        
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
+
+class DiceLoss(nn.Module):
+    """
+    Dice Loss用于分割任务，特别适用于类别不平衡
+    """
+    def __init__(self, smooth: float = 1.0, reduction: str = 'mean'):
+        super().__init__()
+        self.smooth = smooth
+        self.reduction = reduction
+        
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        # inputs: (N, C, H, W), targets: (N, H, W)
+        num_classes = inputs.size(1)
+        
+        # 将targets转换为one-hot编码
+        targets_one_hot = torch.zeros_like(inputs)
+        targets_one_hot.scatter_(1, targets.unsqueeze(1), 1)
+        
+        # 计算softmax概率
+        inputs_soft = torch.softmax(inputs, dim=1)
+        
+        # 计算Dice系数
+        dice_scores = []
+        for i in range(num_classes):
+            pred = inputs_soft[:, i]
+            target = targets_one_hot[:, i]
             
-        return focal_loss.mean()
+            intersection = (pred * target).sum(dim=[1, 2])
+            union = pred.sum(dim=[1, 2]) + target.sum(dim=[1, 2])
+            
+            dice = (2.0 * intersection + self.smooth) / (union + self.smooth)
+            dice_scores.append(dice)
+        
+        dice_scores = torch.stack(dice_scores, dim=1)  # (N, C)
+        dice_loss = 1 - dice_scores.mean(dim=1)  # (N,)
+        
+        if self.reduction == 'mean':
+            return dice_loss.mean()
+        elif self.reduction == 'sum':
+            return dice_loss.sum()
+        else:
+            return dice_loss
+
+
+class CombinedLoss(nn.Module):
+    """
+    组合损失函数：Focal Loss + Dice Loss + 标签平滑交叉熵
+    """
+    def __init__(
+        self, 
+        alpha: torch.Tensor = None, 
+        gamma: float = 2.5,
+        focal_weight: float = 0.5,
+        dice_weight: float = 0.3,
+        ce_weight: float = 0.2,
+        label_smoothing: float = 0.1
+    ):
+        super().__init__()
+        self.focal_loss = FocalLoss(alpha=alpha, gamma=gamma)
+        self.dice_loss = DiceLoss()
+        self.ce_loss = nn.CrossEntropyLoss(weight=alpha, label_smoothing=label_smoothing)
+        
+        self.focal_weight = focal_weight
+        self.dice_weight = dice_weight
+        self.ce_weight = ce_weight
+        
+        # 确保权重和为1
+        total_weight = focal_weight + dice_weight + ce_weight
+        self.focal_weight /= total_weight
+        self.dice_weight /= total_weight
+        self.ce_weight /= total_weight
+        
+    def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        focal = self.focal_loss(inputs, targets)
+        dice = self.dice_loss(inputs, targets)
+        ce = self.ce_loss(inputs, targets)
+        
+        combined = (self.focal_weight * focal + 
+                   self.dice_weight * dice + 
+                   self.ce_weight * ce)
+        
+        return combined
 
 
 def train_epoch(
@@ -60,10 +149,13 @@ def train_epoch(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     scaler: GradScaler,
-    epoch: int
+    epoch: int,
+    scheduler=None,
+    scheduler_step_per_batch: bool = False,
+    gradient_accumulation_steps: int = 1
 ) -> Tuple[float, float]:
     """
-    训练一个epoch
+    训练一个epoch - 支持梯度累积和灵活的学习率调度
     """
     model.train()
     total_loss = 0
@@ -75,8 +167,6 @@ def train_epoch(
     for batch_idx, (data, targets) in enumerate(pbar):
         data, targets = data.to(device), targets.to(device)
         
-        optimizer.zero_grad()
-        
         # 混合精度训练
         with autocast():
             outputs = model(data)
@@ -86,24 +176,45 @@ def train_epoch(
             # 重塑以计算损失
             outputs = outputs.permute(0, 3, 1, 2)  # (batch, num_classes, height, width)
             loss = criterion(outputs, targets)
+            
+            # 梯度累积：将损失除以累积步数
+            loss = loss / gradient_accumulation_steps
         
         # 反向传播
         scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
         
-        # 统计
-        total_loss += loss.item()
+        # 梯度累积逻辑
+        if (batch_idx + 1) % gradient_accumulation_steps == 0:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
+            
+            # 如果使用per-batch调度器（如OneCycleLR）
+            if scheduler is not None and scheduler_step_per_batch:
+                scheduler.step()
+        
+        # 统计（注意这里loss已经是平均过的）
+        total_loss += loss.item() * gradient_accumulation_steps
         _, predicted = outputs.max(1)
         total += targets.numel()
         correct += predicted.eq(targets).sum().item()
         
+        # 获取当前学习率
+        current_lr = optimizer.param_groups[0]['lr']
+        
         # 更新进度条
         accuracy = 100. * correct / total
         pbar.set_postfix({
-            'Loss': f'{loss.item():.4f}',
-            'Acc': f'{accuracy:.2f}%'
+            'Loss': f'{loss.item() * gradient_accumulation_steps:.4f}',
+            'Acc': f'{accuracy:.2f}%',
+            'LR': f'{current_lr:.2e}'
         })
+    
+    # 处理最后一批次的梯度累积
+    if len(train_loader) % gradient_accumulation_steps != 0:
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
     
     epoch_loss = total_loss / len(train_loader)
     epoch_acc = 100. * correct / total
@@ -189,11 +300,29 @@ def train_model(config: Dict[str, Any]):
         dropout=config['dropout']
     ).to(device)
     
-    # 损失函数
-    if config['use_focal_loss']:
-        criterion = FocalLoss(alpha=data_info['class_weights'].to(device), gamma=2.0)
+    # 损失函数 - 使用增强版损失函数
+    if config.get('use_combined_loss', False):
+        criterion = CombinedLoss(
+            alpha=data_info['class_weights'].to(device),
+            gamma=config.get('focal_gamma', 2.5),
+            focal_weight=config.get('focal_weight', 0.5),
+            dice_weight=config.get('dice_weight', 0.3),
+            ce_weight=config.get('ce_weight', 0.2),
+            label_smoothing=config.get('label_smoothing', 0.1)
+        )
+        print(f"Using Combined Loss (Focal+Dice+CE with label_smoothing={config.get('label_smoothing', 0.1)})")
+    elif config['use_focal_loss']:
+        criterion = FocalLoss(
+            alpha=data_info['class_weights'].to(device), 
+            gamma=config.get('focal_gamma', 2.5)
+        )
+        print(f"Using Enhanced Focal Loss (gamma={config.get('focal_gamma', 2.5)})")
     else:
-        criterion = nn.CrossEntropyLoss(weight=data_info['class_weights'].to(device))
+        criterion = nn.CrossEntropyLoss(
+            weight=data_info['class_weights'].to(device),
+            label_smoothing=config.get('label_smoothing', 0.0)
+        )
+        print("Using Cross Entropy Loss with label smoothing")
     
     # 优化器
     optimizer = optim.AdamW(
@@ -202,12 +331,44 @@ def train_model(config: Dict[str, Any]):
         weight_decay=config['weight_decay']
     )
     
-    # 学习率调度器
-    scheduler = CosineAnnealingWarmRestarts(
-        optimizer,
-        T_0=config['T_0'],
-        T_mult=config['T_mult']
-    )
+    # 学习率调度器 - 支持多种策略
+    scheduler_type = config.get('scheduler_type', 'cosine')
+    
+    if scheduler_type == 'onecycle':
+        scheduler = optim.lr_scheduler.OneCycleLR(
+            optimizer,
+            max_lr=config.get('max_lr', config['learning_rate'] * 10),
+            epochs=config['epochs'],
+            steps_per_epoch=len(train_loader),
+            pct_start=config.get('pct_start', 0.3),
+            div_factor=config.get('div_factor', 25.0),
+            final_div_factor=config.get('final_div_factor', 1e4),
+            anneal_strategy=config.get('anneal_strategy', 'cos')
+        )
+        scheduler_step_per_batch = True
+        print(f"Using OneCycleLR (max_lr={config.get('max_lr', config['learning_rate'] * 10):.2e})")
+    elif scheduler_type == 'cosine':
+        scheduler = CosineAnnealingWarmRestarts(
+            optimizer,
+            T_0=config.get('T_0', 10),
+            T_mult=config.get('T_mult', 2)
+        )
+        scheduler_step_per_batch = False
+        print("Using CosineAnnealingWarmRestarts")
+    elif scheduler_type == 'plateau':
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='min',
+            factor=0.5,
+            patience=5,
+            verbose=True
+        )
+        scheduler_step_per_batch = False
+        print("Using ReduceLROnPlateau")
+    else:
+        scheduler = None
+        scheduler_step_per_batch = False
+        print("No learning rate scheduler")
     
     # 混合精度训练
     scaler = GradScaler()
@@ -242,9 +403,12 @@ def train_model(config: Dict[str, Any]):
         print(f"Epoch {epoch}/{config['epochs']}")
         print(f"{'='*60}")
         
-        # 训练
+        # 训练 - 传递新的参数
         train_loss, train_acc = train_epoch(
-            model, train_loader, criterion, optimizer, device, scaler, epoch
+            model, train_loader, criterion, optimizer, device, scaler, epoch,
+            scheduler=scheduler if scheduler_step_per_batch else None,
+            scheduler_step_per_batch=scheduler_step_per_batch,
+            gradient_accumulation_steps=config.get('gradient_accumulation_steps', 1)
         )
         
         # 验证
@@ -252,9 +416,15 @@ def train_model(config: Dict[str, Any]):
             model, val_loader, criterion, device, data_info['num_classes']
         )
         
-        # 学习率调度
-        scheduler.step()
-        current_lr = scheduler.get_last_lr()[0]
+        # 学习率调度（对于非per-batch调度器）
+        if scheduler is not None and not scheduler_step_per_batch:
+            if scheduler_type == 'plateau':
+                scheduler.step(val_loss)  # ReduceLROnPlateau需要传入指标
+            else:
+                scheduler.step()
+        
+        # 获取当前学习率
+        current_lr = optimizer.param_groups[0]['lr']
         
         # 记录历史
         history['train_loss'].append(train_loss)
@@ -348,11 +518,24 @@ def main():
     parser.add_argument('--batch-size', type=int, default=16, help='Batch size')
     parser.add_argument('--learning-rate', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--weight-decay', type=float, default=1e-4, help='Weight decay')
+    parser.add_argument('--gradient-accumulation-steps', type=int, default=1, help='Gradient accumulation steps')
+    
+    # 学习率调度器参数
+    parser.add_argument('--scheduler-type', type=str, default='cosine', 
+                       choices=['onecycle', 'cosine', 'plateau', 'none'],
+                       help='Learning rate scheduler type')
+    parser.add_argument('--max-lr', type=float, default=None, help='Max learning rate for OneCycleLR')
+    parser.add_argument('--pct-start', type=float, default=0.3, help='Percentage of cycle for OneCycleLR warmup')
+    
+    # 损失函数参数
+    parser.add_argument('--use-combined-loss', action='store_true', help='Use combined loss (Focal+Dice+CE)')
+    parser.add_argument('--focal-gamma', type=float, default=2.5, help='Focal loss gamma parameter')
+    parser.add_argument('--label-smoothing', type=float, default=0.1, help='Label smoothing factor')
     
     # 其他参数
     parser.add_argument('--save-dir', type=str, default='./TCN/checkpoints', 
                        help='Directory to save models')
-    parser.add_argument('--use-wandb', default=False, help='Use Weights & Biases')
+    parser.add_argument('--use-wandb', action='store_true', help='Use Weights & Biases')
     
     args = parser.parse_args()
     
@@ -372,7 +555,22 @@ def main():
         'batch_size': args.batch_size,
         'learning_rate': args.learning_rate,
         'weight_decay': args.weight_decay,
+        'gradient_accumulation_steps': args.gradient_accumulation_steps,
+        
+        # 损失函数配置
         'use_focal_loss': True,
+        'use_combined_loss': args.use_combined_loss,
+        'focal_gamma': args.focal_gamma,
+        'label_smoothing': args.label_smoothing,
+        
+        # 学习率调度配置
+        'scheduler_type': args.scheduler_type,
+        'max_lr': args.max_lr or args.learning_rate * 10,
+        'pct_start': args.pct_start,
+        'div_factor': 25.0,
+        'final_div_factor': 1e4,
+        
+        # 兼容旧参数
         'T_0': 10,
         'T_mult': 2,
         'patience': 15,
