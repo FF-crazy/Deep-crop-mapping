@@ -36,6 +36,7 @@ dist/
 /checkpoints_test/
 /checkpoints_train/
 /TCN/checkpoints_test/
+/Models
 
 # API Keys & Secrets
 # (Add any files containing secrets here, e.g., keys.env)
